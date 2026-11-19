@@ -1,26 +1,447 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-heading: var(--font-display);
+
+  /* Marca ONCE */
+  --color-navy: var(--navy);
+  --color-navy-deep: var(--navy-deep);
+  --color-court: var(--court);
+  --color-court-deep: var(--court-deep);
+  --color-lime: var(--lime);
+  --color-lime-deep: var(--lime-deep);
+  --color-cream: var(--cream);
+  --color-teal: var(--teal);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --navy: #0d1d4a;
+  --navy-deep: #081236;
+  --court: #2353c2;
+  --court-deep: #1a3c94;
+  --lime: #d7f25c;
+  --lime-deep: #b9d93a;
+  --cream: #f5f1e6;
+  --teal: #1d6b6e;
+
+  --background: var(--cream);
+  --foreground: var(--navy);
+  --card: #ffffff;
+  --card-foreground: var(--navy);
+  --popover: var(--navy-deep);
+  --popover-foreground: #ffffff;
+  --primary: var(--lime);
+  --primary-foreground: var(--navy);
+  --secondary: var(--navy);
+  --secondary-foreground: #ffffff;
+  --muted: #ebe6d8;
+  --muted-foreground: #4b5577;
+  --accent: var(--lime);
+  --accent-foreground: var(--navy);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: rgb(13 29 74 / 0.12);
+  --input: rgb(13 29 74 / 0.18);
+  --ring: var(--lime);
+  --radius: 0.75rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    background: var(--navy-deep);
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+@layer utilities {
+  /* Tipografía deportiva: condensada, negra e itálica */
+  .font-sport {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 0.86;
+  }
+
+  /* Pastilla con contorno lima del mockup */
+  .pill-outline {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1.5px solid var(--lime);
+    color: var(--lime);
+    font-weight: 700;
+    background: rgb(8 18 54 / 0.18);
+    backdrop-filter: blur(2px);
+  }
+
+  /* Líneas de cancha diagonales */
+  .court-lines {
+    background-image:
+      linear-gradient(115deg, transparent 0 calc(50% - 4px), rgb(255 255 255 / 0.85) calc(50% - 4px) calc(50% + 4px), transparent calc(50% + 4px));
+  }
+}
+
+/* Revelado al hacer scroll */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 2.5rem, 0);
+  transition:
+    opacity 1s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 1.15s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 120ms);
+}
+[data-reveal="left"] {
+  transform: translate3d(-3rem, 0, 0) skewX(-6deg);
+}
+[data-reveal="right"] {
+  transform: translate3d(3rem, 0, 0);
+}
+[data-reveal^="clip"] {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 0 100%);
+  transition: clip-path 1.4s cubic-bezier(0.7, 0, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 120ms);
+}
+/* Para líneas en SVG estirados (non-scaling-stroke): se "dibujan" con un barrido. */
+[data-reveal="clip-up"] {
+  clip-path: inset(100% 0 0 0);
+}
+[data-reveal="clip-down"] {
+  clip-path: inset(0 0 100% 0);
+}
+[data-reveal="pop"] {
+  transform: scale(0.6) rotate(-10deg);
+  transition-timing-function: cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+[data-shown] [data-reveal],
+[data-reveal][data-shown] {
+  opacity: 1;
+  transform: none;
+}
+[data-shown] [data-reveal^="clip"],
+[data-reveal^="clip"][data-shown] {
+  clip-path: inset(0 0 0 0);
+}
+
+/*
+ * Barrido diagonal, como una línea de cancha que corta la tarjeta.
+ * Va en un hijo del [data-reveal-root]: IntersectionObserver toma en cuenta el
+ * clip-path del propio objetivo y, recortado por completo, nunca lo vería entrar.
+ */
+[data-reveal="wipe"] {
+  opacity: 1;
+  transform: none;
+  /* Coordenadas más allá de la caja para no recortar la sombra al final. */
+  clip-path: polygon(-12% -12%, -12% -12%, -40% 112%, -40% 112%);
+  transition: clip-path 1.45s cubic-bezier(0.7, 0, 0.2, 1);
+  transition-delay: var(--wipe-delay, 0ms);
+}
+[data-shown] [data-reveal="wipe"] {
+  clip-path: polygon(-12% -12%, 140% -12%, 112% 112%, -40% 112%);
+}
+
+/* Titular que "azota": entra grande y desenfocado */
+[data-reveal="slam"] {
+  transform: scale(1.35) translate3d(0, -0.08em, 0);
+  filter: blur(10px);
+  transition:
+    opacity 0.6s ease-out,
+    transform 0.95s cubic-bezier(0.2, 1.25, 0.35, 1),
+    filter 0.7s ease-out;
+  transition-delay: calc(var(--i, 0) * 150ms);
+}
+[data-shown] [data-reveal="slam"],
+[data-reveal="slam"][data-shown] {
+  filter: none;
+}
+
+/* Texto que sube desde una máscara (el padre lleva overflow-hidden) */
+[data-reveal="rise"] {
+  opacity: 1;
+  transform: translate3d(0, 105%, 0);
+  transition: transform 0.95s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 120ms + 220ms);
+}
+
+/* Líneas que crecen */
+[data-reveal="grow-x"],
+[data-reveal="grow-y"] {
+  opacity: 1;
+  transition: transform 1.15s cubic-bezier(0.7, 0, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 120ms + 150ms);
+}
+[data-reveal="grow-x"] {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+[data-reveal="grow-y"] {
+  transform: scaleY(0);
+  transform-origin: center;
+}
+
+/* Trazos SVG que se dibujan (el path lleva pathLength="1") */
+[data-reveal="draw"] {
+  opacity: 1;
+  transform: none;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1.3s cubic-bezier(0.6, 0, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 140ms + 200ms);
+}
+[data-shown] [data-reveal="draw"],
+[data-reveal="draw"][data-shown] {
+  stroke-dashoffset: 0;
+}
+
+/* Fotos: se asientan desde un zoom al revelarse (usa `scale`, independiente del parallax) */
+[data-media] {
+  scale: 1.3;
+  transition: scale 2.1s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-shown] [data-media] {
+  scale: 1.12;
+}
+[data-shown].group:hover [data-media] {
+  scale: 1.17;
+}
+
+/* Brillo que cruza los botones principales */
+.shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  transform: skewX(-20deg) translateX(0);
+  pointer-events: none;
+  animation: shine 4.2s cubic-bezier(0.6, 0, 0.3, 1) 1.6s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: skewX(-20deg) translateX(0);
+  }
+  32%,
+  100% {
+    transform: skewX(-20deg) translateX(480%);
+  }
+}
+
+/* Etiqueta flotando suavemente una vez que aparece */
+[data-shown] [data-float] {
+  animation: float 3.2s ease-in-out 1.4s infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12%;
+  }
+}
+
+/* Parallax ligado al scroll (CSS scroll-driven animations; sin soporte, queda quieto) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-parallax] {
+      animation: parallax linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+  /* En móvil la deriva desalinea el titular; solo de tablet en adelante. */
+  @media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
+    [data-drift] {
+      animation: drift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+    }
+  }
+}
+
+@keyframes parallax {
+  from {
+    translate: 0 -6%;
+  }
+  to {
+    translate: 0 6%;
+  }
+}
+
+@keyframes drift {
+  from {
+    translate: calc(var(--drift, 1) * -4%) 0;
+  }
+  to {
+    translate: calc(var(--drift, 1) * 4%) 0;
+  }
+}
+
+@keyframes hint {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(200%);
+  }
+}
+
+/* Peloteo en el diagrama de cancha ("¿Nuevo en el pickleball?"): la sombra
+   recorre el piso y la pelota sube y baja entre bote y bote. */
+.court-ball {
+  animation: rally 5.6s linear infinite;
+}
+.court-ball-body {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rally-lift 5.6s infinite;
+}
+
+@keyframes rally {
+  0%,
+  100% {
+    transform: translate(410px, 160px);
+  }
+  25% {
+    transform: translate(75px, 55px);
+  }
+  50% {
+    transform: translate(375px, 55px);
+  }
+  75% {
+    transform: translate(185px, 145px);
+  }
+}
+
+@keyframes rally-lift {
+  0%,
+  25%,
+  50%,
+  75%,
+  100% {
+    transform: translateY(0) scale(1);
+    animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1);
+  }
+  12.5%,
+  37.5%,
+  87.5% {
+    transform: translateY(-24px) scale(1.45);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4);
+  }
+  62.5% {
+    transform: translateY(-10px) scale(1.18);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4);
+  }
+}
+
+/* Acordeón de preguntas: abre con transición donde el navegador lo soporta */
+:root {
+  interpolate-size: allow-keywords;
+}
+.faq::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    content-visibility 0.4s allow-discrete;
+}
+.faq[open]::details-content {
+  block-size: auto;
+}
+
+/* Etiqueta junto a la bola flotante */
+.ball-link .ball-label {
+  opacity: 0;
+  transform: translate3d(var(--label-shift, 0), -50%, 0) scale(0.85);
+  transition:
+    opacity 0.25s ease,
+    transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.ball-link[data-settled="true"] .ball-label {
+  opacity: 1;
+  transform: translate3d(0, -50%, 0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    filter: none;
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+  [data-media] {
+    scale: 1.12;
+    transition: none;
+  }
+  .shine::after,
+  [data-shown] [data-float],
+  .court-ball,
+  .court-ball-body {
+    animation: none;
+  }
 }
