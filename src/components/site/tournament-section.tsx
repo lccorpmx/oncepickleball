@@ -44,12 +44,12 @@ export function TournamentSection() {
         <div className="relative aspect-[530/284]">
           <Image
             src="/images/torneo.jpg"
-            alt="Pareja mixta jugando pickleball junto a la red"
+            alt="Pareja de dobles lista para recibir junto a la red"
             fill
             sizes="(min-width: 960px) 896px, 100vw"
             data-media
             data-parallax
-            className="object-cover"
+            className="object-cover object-[50%_51%]"
           />
           <div className="absolute inset-y-0 left-0 w-[55%] bg-linear-to-r from-[#24479a]/70 via-[#24479a]/30 to-transparent" />
           <h2 className="font-sport absolute left-[4.2%] top-[5.5%]">

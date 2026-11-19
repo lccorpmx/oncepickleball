@@ -75,7 +75,7 @@ export function ActivitiesSection() {
         <div className="grid gap-5 sm:grid-cols-2">
           <ActivityCard
             image="/images/reta-femenil.jpg"
-            alt="Raqueta rosa, pelotas y tenis sobre la cancha"
+            alt="Jugadoras en un partido de dobles en las canchas techadas de ONCE"
             title={
               <h3 className="font-sport absolute left-[46.5%] top-[4.2%] text-[14.6cqw]">
                 <span data-reveal="right" className="block text-[0.86em] text-white">
@@ -105,7 +105,7 @@ export function ActivitiesSection() {
 
           <ActivityCard
             image="/images/once-kids.jpg"
-            alt="Niña con raqueta de pickleball en la cancha"
+            alt="Niños y jugadores de ONCE con su cheque de premio en la cancha"
             title={
               <h3 className="font-sport absolute left-[9%] top-[3.2%] text-[14.8cqw]">
                 <span data-reveal="left" className="block text-white">

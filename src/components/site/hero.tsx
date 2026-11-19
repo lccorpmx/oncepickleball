@@ -21,12 +21,12 @@ export function Hero() {
         {/* Al final de la intro, el director hace zoom rápido a la cancha. */}
         <div data-stage="zoom" className="absolute inset-0 origin-[50%_88%] will-change-transform">
           <Image
-            src="/images/canchas.jpg"
+            src="/images/hero-canchas.jpg"
             alt=""
             fill
             priority
             sizes="100vw"
-            className="scale-110 object-cover object-[62%_50%] blur-[2px] saturate-[1.2]"
+            className="scale-110 object-cover object-[35%_50%] blur-[2px] saturate-[1.2]"
           />
         </div>
         <div className="absolute inset-0 bg-[#1c43b5] opacity-60 mix-blend-multiply" />

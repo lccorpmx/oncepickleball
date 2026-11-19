@@ -56,12 +56,12 @@ export function CourtsSection() {
               <div data-reveal="clip" className="relative aspect-[652/364] overflow-hidden bg-court">
                 <Image
                   src="/images/canchas.jpg"
-                  alt="Canchas techadas de pickleball en ONCE"
+                  alt="Jugadores en las canchas techadas de ONCE"
                   fill
                   sizes="(min-width: 1024px) 520px, (min-width: 640px) 52vw, 100vw"
                   data-media
                   data-parallax
-                  className="object-cover"
+                  className="object-cover object-[50%_38%]"
                 />
               </div>
             </div>
