@@ -23,7 +23,21 @@ export function RevealObserver() {
       { threshold: 0.2, rootMargin: "0px 0px -8% 0px" }
     );
     targets.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+
+    // Las animaciones infinitas (brillos, pelota del SVG…) se pausan fuera de pantalla:
+    // las de SVG corren en el hilo principal y repintaban en cada frame aunque no se vieran.
+    const offscreen = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) entry.target.toggleAttribute("data-offscreen", !entry.isIntersecting);
+      },
+      { rootMargin: "200px 0px" }
+    );
+    document.querySelectorAll("main > section").forEach((el) => offscreen.observe(el));
+
+    return () => {
+      io.disconnect();
+      offscreen.disconnect();
+    };
   }, []);
 
   return (

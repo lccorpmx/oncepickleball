@@ -83,9 +83,9 @@ const FACE_ASPECT = 0.5625;
 /**
  * Cara de la raqueta: teal con grano, franja recta y el isotipo ONCE.
  * El lienzo cubre la cara completa: u = (x + FACE_HW) / (2·FACE_HW), v = y.
+ * `H` = alto del lienzo: 2048 en escritorio; 1024 basta en móvil (la cara mide < 400 px reales).
  */
-export function createFaceTextures() {
-  const H = 2048;
+export function createFaceTextures(H = 2048) {
   const W = Math.round(H * FACE_ASPECT);
   const { canvas, ctx } = makeCanvas(W, H);
 
@@ -119,8 +119,14 @@ export function createFaceTextures() {
   ctx.globalCompositeOperation = "overlay";
   ctx.globalAlpha = 0.42;
   ctx.drawImage(grain, 0, 0, W, H);
-  ctx.globalAlpha = 0.18;
-  ctx.drawImage(grainCanvas(W, H, 23, 120), 0, 0);
+  // Grano fino: un mosaico de ruido de 256 px repetido (generar ruido a resolución
+  // completa bloqueaba el hilo principal ~1 s en móviles).
+  const fine = ctx.createPattern(grainCanvas(256, 256, 23, 120), "repeat");
+  if (fine) {
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = fine;
+    ctx.fillRect(0, 0, W, H);
+  }
   ctx.restore();
 
   const grainTex = new THREE.CanvasTexture(grain);
@@ -142,6 +148,22 @@ export function createGripTexture() {
   ctx.restore();
 
   // Perforaciones en tresbolillo, con un brillo leve en el borde inferior.
+  // Se dibuja una sola perforación en un sprite y se estampa en cada posición.
+  const R = 8; // medio lado del sprite (cubre el hoyo de 5.5 y el brillo hasta y + 4.6 + 2.4)
+  const hole = makeCanvas(R * 2, R * 2);
+  const g = hole.ctx.createRadialGradient(R, R, 0, R, R, 5.5);
+  g.addColorStop(0, "rgba(96,86,72,0.85)");
+  g.addColorStop(0.7, "rgba(120,108,92,0.55)");
+  g.addColorStop(1, "rgba(120,108,92,0)");
+  hole.ctx.fillStyle = g;
+  hole.ctx.beginPath();
+  hole.ctx.arc(R, R, 5.5, 0, Math.PI * 2);
+  hole.ctx.fill();
+  hole.ctx.fillStyle = "rgba(255,255,255,0.6)";
+  hole.ctx.beginPath();
+  hole.ctx.arc(R, R + 4.6, 2.4, 0, Math.PI);
+  hole.ctx.fill();
+
   const cols = 18;
   const step = S / cols;
   for (let row = 0; row < cols; row++) {
@@ -151,18 +173,7 @@ export function createGripTexture() {
       for (const dx of [0, -S, S]) {
         const cx = x + dx;
         if (cx < -step || cx > S + step) continue;
-        const g = ctx.createRadialGradient(cx, y, 0, cx, y, 5.5);
-        g.addColorStop(0, "rgba(96,86,72,0.85)");
-        g.addColorStop(0.7, "rgba(120,108,92,0.55)");
-        g.addColorStop(1, "rgba(120,108,92,0)");
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(cx, y, 5.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.6)";
-        ctx.beginPath();
-        ctx.arc(cx, y + 4.6, 2.4, 0, Math.PI);
-        ctx.fill();
+        ctx.drawImage(hole.canvas, cx - R, y - R);
       }
     }
   }

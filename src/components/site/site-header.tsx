@@ -12,17 +12,23 @@ export function SiteHeader() {
   const [solid, setSolid] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => {
+    // El límite solo cambia con el tamaño de ventana: medirlo en cada scroll forzaba un reflow.
+    let limit = window.innerHeight;
+    const measure = () => {
       const hero = document.querySelector<HTMLElement>('[data-stage="hero"]');
-      const limit = hero ? hero.offsetHeight - window.innerHeight * 0.9 : window.innerHeight;
-      setSolid(window.scrollY > limit);
+      limit = hero ? hero.offsetHeight - window.innerHeight * 0.9 : window.innerHeight;
     };
-    onScroll();
+    const onScroll = () => setSolid(window.scrollY > limit);
+    const onResize = () => {
+      measure();
+      onScroll();
+    };
+    onResize();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
@@ -30,7 +36,10 @@ export function SiteHeader() {
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-500",
-        solid ? "bg-navy-deep/85 shadow-[0_8px_30px_rgb(0_0_0/0.25)] backdrop-blur-md" : "bg-transparent"
+        // En móvil sin backdrop-blur: debajo está el canvas 3D, que cambia cada frame y obligaba a re-desenfocar.
+        solid
+          ? "bg-navy-deep/95 shadow-[0_8px_30px_rgb(0_0_0/0.25)] md:bg-navy-deep/85 md:backdrop-blur-md"
+          : "bg-transparent"
       )}
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-8">

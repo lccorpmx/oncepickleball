@@ -425,6 +425,16 @@ html.lenis body {
   transform: translate3d(0, -50%, 0) scale(1);
 }
 
+/* Animaciones infinitas en pausa mientras su sección está fuera de pantalla
+   (RevealObserver pone [data-offscreen]). Va después de las reglas `animation:` para ganarles. */
+[data-offscreen] .shine::after,
+[data-offscreen] [data-float],
+[data-offscreen] .court-ball,
+[data-offscreen] .court-ball-body,
+[data-offscreen] [class*="animate-"] {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] {
     opacity: 1;

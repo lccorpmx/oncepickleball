@@ -8,11 +8,14 @@ const Scene = dynamic(() => import("./scene"), { ssr: false });
 /**
  * Capa 3D fija sobre la página (sin eventos) + el enlace accesible que
  * acompaña a la pelota "Reserva tu cancha" por toda la página.
+ *
+ * Alto fijo de 100vh (= viewport grande en móvil): así el canvas no cambia de
+ * tamaño cuando la barra del navegador aparece o se oculta al hacer scroll.
  */
 export function Stage() {
   return (
     <>
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-40 h-screen">
         <Scene />
       </div>
       <a

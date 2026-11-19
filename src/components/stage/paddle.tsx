@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, type RefObject } from "react";
 import * as THREE from "three";
+import { LOW_POWER } from "./quality";
 import { createFaceTextures, createGripTexture } from "./textures";
 
 /** Longitud del mango; la cara empieza aquí (unidades de raqueta). */
@@ -53,8 +54,14 @@ const lathe = (pts: number[][], y0 = 0, segments = 48) =>
     segments
   );
 
-function useFaceGeometry() {
-  return useMemo(() => {
+export type FaceGeometry = { face: THREE.ExtrudeGeometry; guard: THREE.TubeGeometry };
+
+/**
+ * Cara + protector de borde. Se crea una sola vez (en el Director) y la comparten
+ * la raqueta y sus siluetas de estela; quien la crea la libera.
+ */
+export function useFaceGeometry(): FaceGeometry {
+  const geo = useMemo(() => {
     // Cara: placa delgada con UV plano (el lienzo cubre x ∈ [-FACE_HW, FACE_HW], y ∈ [0, 1]).
     const face = new THREE.ExtrudeGeometry(traceOutline(new THREE.Shape(), 0.022), {
       depth: 0.03,
@@ -88,6 +95,14 @@ function useFaceGeometry() {
 
     return { face, guard };
   }, []);
+  useEffect(
+    () => () => {
+      geo.face.dispose();
+      geo.guard.dispose();
+    },
+    [geo]
+  );
+  return geo;
 }
 
 function useHandleGeometry() {
@@ -136,13 +151,12 @@ export type PaddleRefs = {
   twist: RefObject<THREE.Group | null>;
 };
 
-export function Paddle({ refs }: { refs: PaddleRefs }) {
-  const faceGeo = useFaceGeometry();
+export function Paddle({ refs, faceGeo }: { refs: PaddleRefs; faceGeo: FaceGeometry }) {
   const handleGeo = useHandleGeometry();
   const geo = { ...faceGeo, ...handleGeo };
 
   const materials = useMemo(() => {
-    const { map, grain } = createFaceTextures();
+    const { map, grain } = createFaceTextures(LOW_POWER ? 1024 : 2048);
     const gripMap = createGripTexture();
     return {
       face: new THREE.MeshStandardMaterial({
@@ -165,14 +179,13 @@ export function Paddle({ refs }: { refs: PaddleRefs }) {
 
   useEffect(
     () => () => {
-      Object.values(faceGeo).forEach((g) => g.dispose());
       Object.values(handleGeo).forEach((g) => g.dispose());
       materials.face.map?.dispose();
       materials.face.bumpMap?.dispose();
       materials.grip.map?.dispose();
       Object.values(materials).forEach((m) => m.dispose());
     },
-    [faceGeo, handleGeo, materials]
+    [handleGeo, materials]
   );
 
   return (
@@ -193,9 +206,15 @@ export function Paddle({ refs }: { refs: PaddleRefs }) {
 }
 
 /** Siluetas translúcidas que siguen a la raqueta durante el swing (motion blur). */
-export function PaddleGhost({ groupRef, material }: { groupRef: RefObject<THREE.Group | null>; material: THREE.Material }) {
-  const geo = useFaceGeometry();
-  useEffect(() => () => Object.values(geo).forEach((g) => g.dispose()), [geo]);
+export function PaddleGhost({
+  groupRef,
+  material,
+  geo,
+}: {
+  groupRef: RefObject<THREE.Group | null>;
+  material: THREE.Material;
+  geo: FaceGeometry;
+}) {
   return (
     <group ref={groupRef} visible={false}>
       <group position={[0, HANDLE_LEN, 0]}>

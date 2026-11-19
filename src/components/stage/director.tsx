@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { Ball, useBallMaterial, type BallRefs } from "./ball";
-import { Paddle, PaddleGhost, type PaddleRefs } from "./paddle";
+import { Paddle, PaddleGhost, useFaceGeometry, type PaddleRefs } from "./paddle";
 import {
   T,
   aimAngle,
@@ -25,6 +25,8 @@ import {
 const CAMERA_Z = 10;
 const BALL_Z = 0.8;
 const GHOSTS = 3;
+/** Cuando solo hay animación ambiental (giro lento, vaivén), basta con ~30 fps. */
+const AMBIENT_FRAME = 1 / 30;
 
 type Mode = "scrub" | "left" | "right" | "dock";
 
@@ -36,16 +38,29 @@ type Tween = {
   dur: number;
 };
 
+/** Posiciones en coordenadas de documento (independientes del scroll), medidas solo al cambiar el layout. */
+type PageGeometry = {
+  heroTop: number;
+  heroHeight: number;
+  sections: { top: number; mode: Exclude<Mode, "scrub"> }[];
+  dock: { x: number; top: number; r: number } | null;
+};
+
 function rectIn(el: Element, origin: DOMRect) {
   const r = el.getBoundingClientRect();
   return { x: r.left - origin.left + r.width / 2, y: r.top - origin.top + r.height / 2, w: r.width, h: r.height };
 }
 
-/** Mide el DOM del hero y arma el layout de la coreografía. */
-function measure(vw: number, vh: number): Layout | null {
+/**
+ * Mide el DOM del hero y arma el layout de la coreografía.
+ * El alto sale del hero fijado (100svh), no del canvas: en móvil la barra del
+ * navegador cambia el viewport al hacer scroll y la raqueta "brincaba".
+ */
+function measure(vw: number): Layout | null {
   const pin = document.querySelector<HTMLElement>('[data-stage="pin"]');
   const badgeEl = document.querySelector<HTMLElement>('[data-stage="badge"]');
   if (!pin || !badgeEl) return null;
+  const vh = pin.clientHeight || window.innerHeight;
   const origin = pin.getBoundingClientRect();
   const mobile = vw < 768;
 
@@ -95,6 +110,23 @@ function measure(vw: number, vh: number): Layout | null {
   return L;
 }
 
+/** Lee una sola vez las posiciones que antes se pedían al DOM en cada frame. */
+function measurePage(
+  hero: HTMLElement | null,
+  sections: { el: HTMLElement; mode: Exclude<Mode, "scrub"> }[],
+  dock: HTMLElement | null
+): PageGeometry {
+  const y = window.scrollY;
+  const h = hero?.getBoundingClientRect();
+  const d = dock?.getBoundingClientRect();
+  return {
+    heroTop: h ? h.top + y : 0,
+    heroHeight: h ? h.height : 0,
+    sections: sections.map((sec) => ({ top: sec.el.getBoundingClientRect().top + y, mode: sec.mode })),
+    dock: d ? { x: d.left + d.width / 2, top: d.top + y + d.height / 2, r: d.width / 2 } : null,
+  };
+}
+
 export function Director() {
   const size = useThree((s) => s.size);
   const viewport = useThree((s) => s.viewport);
@@ -122,11 +154,14 @@ export function Director() {
   );
   useEffect(() => () => ghostMats.forEach((m) => m.dispose()), [ghostMats]);
 
+  const faceGeo = useFaceGeometry();
   const ballMaterial = useBallMaterial();
 
   const st = useRef({
     layout: null as Layout | null,
     dirty: true,
+    page: null as PageGeometry | null,
+    pageDirty: true,
     mode: null as Mode | null,
     tween: null as Tween | null,
     blend: null as { from: BallPose; start: number } | null,
@@ -134,6 +169,13 @@ export function Director() {
     roll: 0,
     spinY: 0,
     lastZoom: "",
+    lastHint: "",
+    lastLink: "",
+    lastP: -1,
+    lastScrollY: -1,
+    lastTick: 0,
+    lastRender: 0,
+    ambient: true,
     hover: 0,
     hovering: false,
     reduced: false,
@@ -161,11 +203,19 @@ export function Director() {
       el,
       mode: el.dataset.ball as Exclude<Mode, "scrub">,
     }));
-    const invalidate = () => (s.dirty = true);
+    const invalidate = () => {
+      s.dirty = true;
+      s.pageDirty = true;
+    };
+    const invalidatePage = () => (s.pageDirty = true);
     document.fonts?.ready.then(invalidate);
     const ro = new ResizeObserver(invalidate);
     const pin = document.querySelector('[data-stage="pin"]');
     if (pin) ro.observe(pin);
+    // Cualquier cambio de alto de la página (p. ej. abrir una pregunta del FAQ) mueve las secciones.
+    const pageRo = new ResizeObserver(invalidatePage);
+    pageRo.observe(document.body);
+    window.addEventListener("resize", invalidatePage);
 
     const link = s.dom.link;
     const enter = () => (s.hovering = true);
@@ -176,6 +226,8 @@ export function Director() {
     link?.addEventListener("blur", leave);
     return () => {
       ro.disconnect();
+      pageRo.disconnect();
+      window.removeEventListener("resize", invalidatePage);
       link?.removeEventListener("pointerenter", enter);
       link?.removeEventListener("pointerleave", leave);
       link?.removeEventListener("focus", enter);
@@ -185,26 +237,55 @@ export function Director() {
 
   useEffect(() => {
     st.current.dirty = true;
+    st.current.pageDirty = true;
   }, [size.width, size.height]);
 
-  useFrame((state, delta) => {
+  // Prioridad 1: este frame decide si hace falta volver a dibujar (R3F ya no renderiza solo).
+  useFrame((state) => {
     const s = st.current;
+    const t = state.clock.elapsedTime;
+    const now = performance.now() / 1000;
+    const scrollY = window.scrollY;
+    const hoverTarget = s.hovering ? 1 : 0;
+    // Sin scroll, rebotes ni hover, y sin frame ambiental pendiente: no hay nada que calcular.
+    const quiet =
+      !s.dirty &&
+      !s.pageDirty &&
+      scrollY === s.lastScrollY &&
+      !s.tween &&
+      !s.blend &&
+      Math.abs(s.hover - hoverTarget) <= 0.002 &&
+      t >= 2;
+    if (quiet && (!s.ambient || now - s.lastRender < AMBIENT_FRAME - 0.004)) return;
+    // Delta real desde el último frame calculado (los frames saltados no deben frenar el giro).
+    const dt = Math.min(now - (s.lastTick || now), 0.1);
+    s.lastTick = now;
+    s.lastScrollY = scrollY;
+
     const vw = size.width;
-    const vh = size.height;
+    // Alto del canvas: solo para proyectar píxeles a 3D. La coreografía usa L.vh (alto del hero).
+    const ch = size.height;
+    let forceRender = false;
     if (s.dirty || !s.layout) {
-      s.layout = measure(vw, vh);
+      s.layout = measure(vw);
       s.dirty = false;
+      forceRender = true;
     }
     const L = s.layout;
     if (!L) return;
+    const vh = L.vh;
+    if (s.pageDirty || !s.page) {
+      s.page = measurePage(s.dom.hero, s.dom.sections, s.dom.dock);
+      s.pageDirty = false;
+      forceRender = true;
+    }
+    const page = s.page;
 
-    const t = state.clock.elapsedTime;
-    const now = performance.now() / 1000;
-    const unit0 = viewport.getCurrentViewport(camera, [0, 0, 0]).height / vh;
+    const unit0 = viewport.getCurrentViewport(camera, [0, 0, 0]).height / ch;
     const unitAt = (z: number) => (unit0 * (CAMERA_Z - z)) / CAMERA_Z;
     const toWorld = (x: number, y: number, z: number) => {
       const u = unitAt(z);
-      return [(x - vw / 2) * u, (vh / 2 - y) * u, z] as const;
+      return [(x - vw / 2) * u, (ch / 2 - y) * u, z] as const;
     };
 
     // Progreso de la intro (hero fijado).
@@ -212,12 +293,10 @@ export function Director() {
     let p = 1;
     let pRaw = 1;
     let pExit = 2;
-    const hero = s.dom.hero;
-    if (hero) {
-      const r = hero.getBoundingClientRect();
-      const travel = Math.max(r.height - vh, 1);
-      pRaw = -r.top / travel;
-      pExit = r.height / travel;
+    if (s.dom.hero) {
+      const travel = Math.max(page.heroHeight - vh, 1);
+      pRaw = (scrollY - page.heroTop) / travel;
+      pExit = page.heroHeight / travel;
       p = clamp(pRaw);
     }
     const idle = s.reduced ? 0 : 1 - range(p, 0, 0.06);
@@ -271,7 +350,13 @@ export function Director() {
         s.lastWord[i] = key;
       }
     });
-    if (s.dom.hint) s.dom.hint.style.opacity = (1 - range(p, 0, 0.05)).toFixed(3);
+    if (s.dom.hint) {
+      const hint = (1 - range(p, 0, 0.05)).toFixed(3);
+      if (s.lastHint !== hint) {
+        s.dom.hint.style.opacity = hint;
+        s.lastHint = hint;
+      }
+    }
 
     /* ---------------- Zoom a la cancha ---------------- */
     // Rápido al principio y sigue acercándose mientras el hero se va y entra la segunda sección.
@@ -290,16 +375,15 @@ export function Director() {
     let mode: Mode = "scrub";
     if (p >= 0.999) {
       mode = "right";
-      for (const sec of s.dom.sections) {
-        if (sec.el.getBoundingClientRect().top < vh * 0.6) mode = sec.mode;
+      for (const sec of page.sections) {
+        if (sec.top - scrollY < vh * 0.6) mode = sec.mode;
       }
     }
 
     const dockPose = (): BallPose => {
-      const el = s.dom.dock;
-      if (!el) return cornerPose(L, "right");
-      const r = el.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 };
+      const d = page.dock;
+      if (!d) return cornerPose(L, "right");
+      return { x: d.x, y: d.top - scrollY, r: d.r };
     };
     const poseFor = (m: Exclude<Mode, "scrub">) => (m === "dock" ? dockPose() : cornerPose(L, m));
 
@@ -320,6 +404,7 @@ export function Director() {
         };
       }
       s.mode = mode;
+      forceRender = true;
     }
 
     let pose: BallPose;
@@ -328,6 +413,7 @@ export function Director() {
     let shadow = 0;
     let ring = 0;
     let rollTarget: number | null = null;
+    let animating = false;
 
     if (mode === "scrub") {
       const f = ballScrub(L, p);
@@ -338,6 +424,7 @@ export function Director() {
       ring = f.ring;
       rollTarget = f.roll;
     } else if (s.tween) {
+      animating = true;
       const tw = s.tween;
       const u = clamp((now - tw.start) / tw.dur);
       const to = poseFor(tw.target);
@@ -352,6 +439,7 @@ export function Director() {
     }
 
     if (s.blend) {
+      animating = true;
       const u = clamp((now - s.blend.start) / 0.4);
       const e = easeOutCubic(u);
       pose = {
@@ -366,21 +454,24 @@ export function Director() {
     const dx = pose.x - s.pose.x;
     if (rollTarget !== null && !s.blend) s.roll = rollTarget;
     else s.roll -= dx / Math.max(pose.r, 1);
+    const poseMoved = dx !== 0 || pose.y !== s.pose.y || pose.r !== s.pose.r;
     s.pose = pose;
 
-    s.hover = lerp(s.hover, s.hovering ? 1 : 0, 1 - Math.exp(-delta * 10));
+    const hoverMoving = Math.abs(s.hover - hoverTarget) > 0.002;
+    s.hover = lerp(s.hover, hoverTarget, 1 - Math.exp(-dt * 10));
     const settled = mode !== "scrub" && mode !== "dock" && !s.tween && !s.blend;
     const spinRate = (settled ? 0.35 : 0.15) + s.hover * 2.2;
-    if (!s.reduced) s.spinY += delta * spinRate * morph;
+    if (!s.reduced) s.spinY += dt * spinRate * morph;
 
     const bRoot = ball.root.current;
     const bSpin = ball.spin.current;
     const body = ball.body.current;
+    let ballVisible = false;
     if (bRoot && bSpin && body) {
       const u = unitAt(BALL_Z);
       const hoverScale = 1 + s.hover * 0.08;
       const rad = pose.r * hoverScale;
-      bRoot.visible = rad > 0.01;
+      bRoot.visible = ballVisible = rad > 0.01;
       bRoot.position.set(...toWorld(pose.x, pose.y + squash * rad, BALL_Z));
       bRoot.scale.set(rad * u * (1 + squash * 0.8), rad * u * (1 - squash), rad * u * (1 + squash * 0.8));
       const wobble = (1 - morph) * idle * Math.sin(t * 1.6) * 0.05;
@@ -416,19 +507,39 @@ export function Director() {
       }
     }
 
-    // Botón accesible que sigue a la pelota.
+    // Botón accesible que sigue a la pelota (solo se escribe al DOM si cambió).
     const link = s.dom.link;
     if (link) {
-      const d = pose.r * 2;
-      link.style.width = `${d}px`;
-      link.style.height = `${d}px`;
-      link.style.transform = `translate3d(${(pose.x - pose.r).toFixed(1)}px, ${(pose.y - pose.r).toFixed(1)}px, 0)`;
+      const d = (pose.r * 2).toFixed(1);
+      const tf = `translate3d(${(pose.x - pose.r).toFixed(1)}px, ${(pose.y - pose.r).toFixed(1)}px, 0)`;
+      const key = d + tf;
+      if (s.lastLink !== key) {
+        link.style.width = `${d}px`;
+        link.style.height = `${d}px`;
+        link.style.transform = tf;
+        s.lastLink = key;
+      }
       const side = pose.x < vw / 2 ? "left" : "right";
       if (link.dataset.side !== side) link.dataset.side = side;
       const set = settled ? "true" : "false";
       if (link.dataset.settled !== set) link.dataset.settled = set;
     }
-  });
+
+    /* ---------------- ¿Hace falta dibujar? ---------------- */
+    // Cambios por scroll, rebotes o hover: cada frame. Solo vaivén/giro ambiental: ~30 fps.
+    const scrolled = Math.abs(p - s.lastP) > 1e-6;
+    s.lastP = p;
+    // Los primeros segundos se dibuja siempre: el entorno de luces y la textura del texto llegan asíncronos.
+    const warmingUp = t < 2;
+    const active = forceRender || warmingUp || scrolled || animating || poseMoved || hoverMoving;
+    const ambient =
+      !s.reduced && ((idle > 0.001 && (sw.visible || ballVisible)) || (morph > 0.001 && ballVisible));
+    s.ambient = ambient;
+    if (active || (ambient && now - s.lastRender >= AMBIENT_FRAME - 0.004)) {
+      state.gl.render(state.scene, state.camera);
+      s.lastRender = now;
+    }
+  }, 1);
 
   return (
     <>
@@ -437,9 +548,9 @@ export function Director() {
       <directionalLight position={[5, -2, 4]} intensity={0.45} color="#9db8ff" />
       <directionalLight position={[6, 3, -5]} intensity={1.1} color="#dfe8ff" />
       {ghostRefs.map((ref, i) => (
-        <PaddleGhost key={i} groupRef={ref} material={ghostMats[i]} />
+        <PaddleGhost key={i} groupRef={ref} material={ghostMats[i]} geo={faceGeo} />
       ))}
-      <Paddle refs={paddle} />
+      <Paddle refs={paddle} faceGeo={faceGeo} />
       <Ball refs={ball} material={ballMaterial} />
     </>
   );

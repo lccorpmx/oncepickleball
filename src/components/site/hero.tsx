@@ -20,16 +20,17 @@ export function Hero() {
       <div data-stage="pin" className="sticky top-0 h-svh overflow-hidden">
         {/* Al final de la intro, el director hace zoom rápido a la cancha. */}
         <div data-stage="zoom" className="absolute inset-0 origin-[50%_88%] will-change-transform">
+          {/* El desenfoque, la saturación y el tinte azul vienen ya aplicados en la imagen:
+              como filtros CSS la GPU los recalculaba en cada frame del zoom. */}
           <Image
-            src="/images/hero-canchas.jpg"
+            src="/images/hero-fondo.jpg"
             alt=""
             fill
             priority
             sizes="100vw"
-            className="scale-110 object-cover object-[35%_50%] blur-[2px] saturate-[1.2]"
+            className="scale-110 object-cover object-[35%_50%]"
           />
         </div>
-        <div className="absolute inset-0 bg-[#1c43b5] opacity-60 mix-blend-multiply" />
         <div className="absolute inset-0 bg-linear-to-b from-navy-deep/90 via-navy-deep/25 to-navy-deep/5" />
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-navy-deep/60 to-transparent" />
         <h1 className="font-sport absolute left-[30%] top-[18%] text-[12.5vw] text-white drop-shadow-[0_8px_28px_rgb(0_0_0/0.35)] md:left-[45%] md:top-[20%] md:text-[min(7.2vw,13.5vh)]">

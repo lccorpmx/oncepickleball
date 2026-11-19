@@ -5,6 +5,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { Director } from "./director";
+import { LOW_POWER } from "./quality";
 
 function Environment() {
   const gl = useThree((s) => s.gl);
@@ -27,11 +28,13 @@ export default function Scene() {
   return (
     <Canvas
       flat
-      dpr={[1, 1.75]}
+      dpr={[1, LOW_POWER ? 1.5 : 1.75]}
       camera={{ position: [0, 0, 10], fov: 28, near: 0.1, far: 40 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      style={{ position: "fixed", inset: 0, pointerEvents: "none" }}
-      onCreated={() => {
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      onCreated={({ gl }) => {
+        // Verificar cada shader obliga a esperar su compilación (bloquea el hilo principal).
+        if (process.env.NODE_ENV === "production") gl.debug.checkShaderErrors = false;
         document.documentElement.dataset.webgl = "ready";
       }}
     >
